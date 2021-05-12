@@ -273,7 +273,7 @@ class EmpresaController extends Controller
         $get_fb_business_adaccounts = $this->get_fb_business_adaccounts($app_id, $app_secret, $access_token, $userid, $business_ad_id_search);
 
         if($get_fb_business_adaccounts['status'] == 'Ok'){
-            
+             
         }
 
         dd("fin 4");
