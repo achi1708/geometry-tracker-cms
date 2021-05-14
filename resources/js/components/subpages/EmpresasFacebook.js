@@ -1,12 +1,13 @@
 import React, {Component} from 'react';
-import { Redirect, withRouter } from 'react-router-dom';
+import { Switch, Route, withRouter, Redirect } from 'react-router-dom';
+import EmpresasFacebookTabs from './EmpresasFacebookTabs';
 import PageHeading from '../elements/PageHeading';
 import Empresas from './../services/Empresas';
-import FacebookBtn from './../elements/facebook/FacebookBtn';
 
 class EmpresasFacebook extends Component {
     constructor (props) {
         super(props);
+
         this.state = {
             empresaData: {
                 name: '',
@@ -17,15 +18,9 @@ class EmpresasFacebook extends Component {
             },
             empresaId: false
         };
-
-        this.getEmpresaData = this.getEmpresaData.bind(this);
-        this.makeFacebookBtn = this.makeFacebookBtn.bind(this);
-        this.mainReadInfoFn = this.mainReadInfoFn.bind(this);
     }
-
     componentDidMount () {
         let {params} = this.props.match;
-        const self = this;
         if(params.empresaId){
             this.setState({empresaId: params.empresaId}, function () {
                 this.getEmpresaData();
@@ -51,36 +46,25 @@ class EmpresasFacebook extends Component {
         }
     }
 
-    makeFacebookBtn () {
-        if(this.state.empresaData.name != ''){
-            return (
-                <FacebookBtn mainreadinfo={this.mainReadInfoFn} empresadata={this.state.empresaData} />
-            );
-        }else{
-            return '0';
-        }
-    }
-
-    async mainReadInfoFn (fat, ftt, fuid) {
-        console.log("mainReadInfoFn");
-        console.log(fat);
-        console.log(ftt);
-        console.log(fuid);
-        const params = {fat, ftt, fuid, emp: this.state.empresaId};
-        let req = await Empresas.readFacebookInfo(params);
-        console.log(req);    
-    }
-
     render () {
-
+        let {path, url} = this.props.match;
         let {name} = this.state.empresaData;
-        const fbBtn = this.makeFacebookBtn();
 
         return (
             <div className="container-fluid">
-                <PageHeading headingtxt={`${name} - Facebook`} btn1={fbBtn} />
+                <PageHeading headingtxt={`${name} - Facebook`} />
 
                 <div className="row">
+                    <Switch>
+                        <Redirect exact from={`${path}/`} to={`${path}/publish_post`} />
+                        <Redirect exact from={`${path}`} to={`${path}/publish_post`} />
+                        <Route path={`${path}/:tabname?`}>
+                            <EmpresasFacebookTabs 
+                                empresaid={this.state.empresaId} 
+                                empresadata={this.state.empresaData} 
+                                userdata={this.props.userdata} />
+                        </Route>
+                    </Switch>
                 </div>
             </div>
         )

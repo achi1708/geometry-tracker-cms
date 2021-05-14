@@ -10,6 +10,9 @@ use App\Models\App;
 use App\Models\User;
 use App\Models\FacebookPublishPosts;
 use App\Models\FacebookPageInsights;
+use App\Models\FacebookEmpresasAdaccounts;
+use App\Models\FacebookEmpresasAdcampaigns;
+use App\Models\FacebookEmpresasAds;
 use App\Http\Resources\EmpresaResource;
 use Illuminate\Support\Facades\DB;
 
@@ -17,6 +20,7 @@ use FacebookAds\Object\User as FbUser;
 use FacebookAds\Object\Page;
 use FacebookAds\Object\Business;
 use FacebookAds\Object\AdAccount;
+use FacebookAds\Object\Campaign;
 use FacebookAds\Api;
 use FacebookAds\Logger\CurlLogger;
 use FacebookAds\Http\Exception\AuthorizationException;
@@ -273,10 +277,44 @@ class EmpresaController extends Controller
         $get_fb_business_adaccounts = $this->get_fb_business_adaccounts($app_id, $app_secret, $access_token, $userid, $business_ad_id_search);
 
         if($get_fb_business_adaccounts['status'] == 'Ok'){
-             
+            $this->save_empresas_fb_adaccounts($get_fb_business_adaccounts['data'], $request['emp']);
+
+            $campaigns_by_adaccount = array();
+            foreach($get_fb_business_adaccounts['data'] as $adaccount_info){
+                if($adaccount_info['account_status'] == 1){
+                    $campaigns_by_adaccount[$adaccount_info['id']] = array();
+                    $get_campaigns = $this->get_fb_adaccounts_campaigns($app_id, $app_secret, $access_token, $adaccount_info['id']);
+
+                    if($get_campaigns['status'] == 'Ok'){
+                        $campaigns_by_adaccount[$adaccount_info['id']] = $get_campaigns['data'];
+                    }
+                }
+            }
+
+            if(count($campaigns_by_adaccount) > 0){
+                $this->save_empresas_fb_adcampaigns($campaigns_by_adaccount, $request['emp']);
+
+                foreach($campaigns_by_adaccount as $adaccount_id => $campaigns){
+                    foreach($campaigns as $key => $campaign){
+                        $get_ads = $this->get_fb_adcampaign_ads($app_id, $app_secret, $access_token, $campaign['id']);
+
+                        if($get_ads['status'] == 'Ok'){
+                            $campaigns_by_adaccount[$adaccount_id][$key]['ads_list'] = $get_ads['data'];
+                        }
+                    }
+                }
+
+                foreach($campaigns_by_adaccount as $adaccount_id => $campaigns){
+                    foreach($campaigns as $key => $campaign){
+                        if(isset($campaign['ads_list'])){
+                            $this->save_empresas_fb_ads($campaign['ads_list'], $campaign['id'], $adaccount_id, $request['emp']);
+                        }
+                    }
+                }
+            }
         }
 
-        dd("fin 4");
+        dd("fin 6");
 
         $data_actual = array($access_token,$app_secret,$app_id,$userid,$account_id);
         
@@ -560,6 +598,10 @@ class EmpresaController extends Controller
         if($business_id_final){
             try{
                 $fields = array(
+                    'id',
+                    'account_id',
+                    'name',
+                    'account_status'
                 );
         
                 $params = array(
@@ -572,9 +614,9 @@ class EmpresaController extends Controller
                 
                 if(is_array($business_ad_accounts) && isset($business_ad_accounts['data'])){
                     if(count($business_ad_accounts['data']) > 0){
-                        $business_ad_accounts_list = array_map(function($data){
-                            return $data['id'];
-                        }, $business_ad_accounts['data']);
+                        $business_ad_accounts_list = array_filter($business_ad_accounts['data'], function($data){
+                            return ($data['account_status'] == 1);
+                        });
 
                         $return['status'] = 'Ok';
                         $return['msg'] = 'info_ok';
@@ -593,6 +635,104 @@ class EmpresaController extends Controller
                 $return['msg'] = 'No se encuentra información para poder obtener Ads de la empresa [004]';
             }
             
+        }
+
+        return $return;
+    }
+
+    private function get_fb_adaccounts_campaigns($app_id, $app_secret, $access_token, $adaccount_id)
+    {
+        $return = array('status' => 'Ok', 'msg' => '', 'data' => '');
+        $api = Api::init($app_id, $app_secret, $access_token);
+        $api->setLogger(new CurlLogger());
+
+        try{
+
+            $fields = array(
+                'id',
+                'name',
+                'objective',
+                'status',
+                'budget_remaining',
+                'buying_type',
+                'configured_status',
+                'daily_budget',
+                'effective_status',
+                'issues_info',
+                'created_time',
+                'start_time',
+                'stop_time'
+            );
+
+            $params = array(
+            );
+
+            $info_adaccount_campaigns = (new AdAccount($adaccount_id))->getCampaigns(
+                $fields,
+                $params
+            )->getResponse()->getContent();
+
+            if(is_array($info_adaccount_campaigns) && isset($info_adaccount_campaigns['data'])){
+                if(count($info_adaccount_campaigns['data']) > 0){
+                    $return['status'] = 'Ok';
+                    $return['msg'] = 'info_ok';
+                    $return['data'] = $info_adaccount_campaigns['data'];
+                }else{
+                    $return['status'] = 'Error';
+                    $return['msg'] = 'No se encuentra información de campañas para esta adaccount';
+                }
+            }else{
+                $return['status'] = 'Error';
+                $return['msg'] = 'No se encuentra información de campañas para esta adaccount';
+            }
+        
+        } catch(Exception $e){
+            $return['status'] = 'Error';
+            $return['msg'] = 'No se encuentra información de campañas para esta adaccount';
+        }
+
+        return $return;
+    }
+
+    private function get_fb_adcampaign_ads($app_id, $app_secret, $access_token, $adcampaign_id)
+    {
+        $return = array('status' => 'Ok', 'msg' => '', 'data' => '');
+        $api = Api::init($app_id, $app_secret, $access_token);
+        $api->setLogger(new CurlLogger());
+
+        try{
+
+            $fields = array(
+                'id',
+                'name',
+                'insights'
+            );
+
+            $params = array(
+            );
+
+            $info_adcampaign_ads = (new Campaign($adcampaign_id))->getAds(
+                $fields,
+                $params
+            )->getResponse()->getContent();
+
+            if(is_array($info_adcampaign_ads) && isset($info_adcampaign_ads['data'])){
+                if(count($info_adcampaign_ads['data']) > 0){
+                    $return['status'] = 'Ok';
+                    $return['msg'] = 'info_ok';
+                    $return['data'] = $info_adcampaign_ads['data'];
+                }else{
+                    $return['status'] = 'Error';
+                    $return['msg'] = 'No se encuentra información de ads para esta campaña';
+                }
+            }else{
+                $return['status'] = 'Error';
+                $return['msg'] = 'No se encuentra información de ads para esta campaña';
+            }
+        
+        } catch(Exception $e){
+            $return['status'] = 'Error';
+            $return['msg'] = 'No se encuentra información de ads para esta campaña';
         }
 
         return $return;
@@ -674,6 +814,145 @@ class EmpresaController extends Controller
                             }
                         }
                     }
+                }
+            });
+        }
+    }
+
+    private function save_empresas_fb_adaccounts($info_emp_adaccounts, $empresa_id)
+    {
+        if(count($info_emp_adaccounts) > 0){
+            $adaccounts_ids = array_map(function($data){
+                return $data['id'];
+            }, $info_emp_adaccounts);
+
+            DB::transaction(function () use( $info_emp_adaccounts, $empresa_id, $adaccounts_ids ) {
+
+                $empresa_adaccounts = FacebookEmpresasAdaccounts::where('status', 1)
+                                                                ->where('empresa_id', $empresa_id)
+                                                                ->get();
+
+                foreach($empresa_adaccounts as $empresa_adaccount){
+                    if(!in_array($empresa_adaccount->account_id, $adaccounts_ids)){
+                        $empresa_adaccount->status = 0;
+                        $empresa_adaccount->save();
+                    }
+                }
+
+                foreach($info_emp_adaccounts as $info_emp_adaccount){
+                    $existe_adaccount = FacebookEmpresasAdaccounts::where('account_id', $info_emp_adaccount['id'])
+                                                                ->where('empresa_id', $empresa_id)
+                                                                ->first();
+
+                    if($existe_adaccount){
+                        $existe_adaccount->account_name = $info_emp_adaccount['name'];
+                        $existe_adaccount->status = ($info_emp_adaccount['account_status'] == 1 ? $info_emp_adaccount['account_status'] : 0);
+                        $existe_adaccount->save();
+                    }else{
+                        $data_new_adaccount = array('empresa_id' => $empresa_id,
+                                                    'account_id' => $info_emp_adaccount['id'],
+                                                    'account_name' => $info_emp_adaccount['name'],
+                                                    'status' => ($info_emp_adaccount['account_status'] == 1 ? $info_emp_adaccount['account_status'] : 0));
+
+                        $new_emp_adaccount = FacebookEmpresasAdaccounts::create($data_new_adaccount);                            
+                    }
+                }
+            });
+        }
+    }
+
+    private function save_empresas_fb_adcampaigns($campaigns_by_adaccount, $empresa_id)
+    {
+        if(count($campaigns_by_adaccount) > 0){
+            DB::transaction(function () use( $campaigns_by_adaccount, $empresa_id ) {
+                foreach($campaigns_by_adaccount as $adaccount_id => $campaigns_items){
+                    $get_adaccount = FacebookEmpresasAdaccounts::where('account_id', $adaccount_id)
+                                                                ->where('empresa_id', $empresa_id)
+                                                                ->first();
+
+                    if($get_adaccount){
+                        foreach($campaigns_items as $campaigns_item){
+                            if(isset($campaigns_item['id'])){
+                                $data_campaign = array('adaccount_id' => $get_adaccount->id,
+                                                   'campaign_id' => $campaigns_item['id'],
+                                                   'campaign_name' => '',
+                                                   'objective' => '',
+                                                   'status' => '',
+                                                   'budget_remaining' => '',
+                                                   'buying_type' => '',
+                                                   'configured_status' => '',
+                                                   'daily_budget' => '',
+                                                   'effective_status' => '',
+                                                   'issues_info' => '',
+                                                   'created_time' => '',
+                                                   'start_time' => '',
+                                                   'stop_time' => '');
+
+                                $data_campaign_filled = false;
+        
+                                foreach($campaigns_item as $field => $value){
+                                    if($field == 'name'){
+                                        $data_campaign['campaign_name'] = $value;
+                                        $data_campaign_filled = true;
+                                    }elseif(isset($data_campaign[$field])){
+                                        $data_campaign[$field] = $value;
+                                        $data_campaign_filled = true;
+                                    }
+                                }
+        
+                                if(!$data_campaign_filled){
+                                    continue;
+                                }
+        
+                                $campaign_exists = FacebookEmpresasAdcampaigns::where('adaccount_id', $get_adaccount->id)
+                                                    ->where('campaign_id', $campaigns_item['id'])
+                                                    ->first();
+        
+                                if($campaign_exists){
+                                    $campaign_exists->update($data_campaign);
+                                }else{
+                                    $campaign_new = FacebookEmpresasAdcampaigns::create($data_campaign);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    private function save_empresas_fb_ads($ads_list, $campaign_id, $adaccount_id, $empresa_id){
+        if(count($ads_list) > 0){
+            DB::transaction(function () use( $ads_list, $campaign_id, $adaccount_id, $empresa_id ) {
+                $get_emp_account = FacebookEmpresasAdaccounts::where('empresa_id', $empresa_id)
+                                                            ->where('account_id', $adaccount_id)
+                                                            ->first();
+
+                if($get_emp_account){
+                    $get_campaign = FacebookEmpresasAdcampaigns::where('adaccount_id', $get_emp_account->id)
+                                                            ->where('campaign_id', $campaign_id)
+                                                            ->first();
+
+                    if($get_campaign){
+                        foreach($ads_list as $ad_item){
+                            $ad_exists = FacebookEmpresasAds::where('adcampaign_id', $get_campaign->id)
+                                                            ->where('ad_id', $ad_item['id'])
+                                                            ->first();
+
+                            if($ad_exists){
+                                $ad_exists->name = $ad_item['name'];
+                                $ad_exists->insights = (isset($ad_item['insights']) ? $ad_item['insights']['data'] : '[]' );
+                            }else{
+                                $new_ad_data = array('adcampaign_id' => $get_campaign->id,
+                                                     'ad_id'         => $ad_item['id'],
+                                                     'name'          => $ad_item['name'],
+                                                     'insights'      => (isset($ad_item['insights']) ? $ad_item['insights']['data'] : '[]' )
+                                                    );
+
+                                $ad_new = FacebookEmpresasAds::create($new_ad_data);
+                            }
+                        }
+                    }                                                            
                 }
             });
         }
