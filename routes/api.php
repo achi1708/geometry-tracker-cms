@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\ApiAuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmpresaController;
+use App\Http\Controllers\FacebookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -46,6 +47,11 @@ Route::middleware('json.response', 'auth:api')->group(function () {
         Route::put('/{empresa}', [EmpresaController::class, 'update'])->middleware('api.superAdmin')->name('api.empresas_update');
         Route::delete('/{empresa}', [EmpresaController::class, 'destroy'])->middleware('api.superAdmin')->name('api.empresas_delete');
         Route::post('/readFbData', [EmpresaController::class, 'readFbData'])->name('api.empresas_readfb');
+    });
+
+    //Facebook
+    Route::group(['prefix' => 'facebook'], function () {
+        Route::get('/published_posts', [FacebookController::class, 'getPublishedPosts'])->middleware('api.admin')->name('api.facebook_published_posts_get');
     });
 });
 

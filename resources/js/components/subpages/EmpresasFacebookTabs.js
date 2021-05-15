@@ -1,6 +1,7 @@
 import React, {Component} from 'react';
 import { Switch, Route, withRouter } from 'react-router-dom';
 import {Tabs, Tab, AppBar} from '@material-ui/core'
+import FacebookPublishedPosts from './../elements/facebook/FacebookPublishedPosts';
 
 class EmpresasFacebookTabs extends Component {
     constructor (props) {
@@ -48,7 +49,7 @@ class EmpresasFacebookTabs extends Component {
                         <Tab label="Page Insights" />
                     </Tabs>
                 </AppBar>
-                {this.state.selectedTabIndex === 0 && 'Heyy Published Posts'}
+                {this.state.selectedTabIndex === 0 && <FacebookPublishedPosts empresaid={this.props.empresaid} empresadata={this.props.empresadata} userdata={this.props.userdata} />}
                 {this.state.selectedTabIndex === 1 && 'Heyy Insights'}
             </>
         )
