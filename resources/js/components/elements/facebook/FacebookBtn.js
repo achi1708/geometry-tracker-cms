@@ -12,6 +12,7 @@ class FacebookBtn extends Component {
     }
 
     callToAction () {
+        const self = this;
         if(this.props.empresadata.factive == true){
             self.scanBusiness(this.props.empresadata.fat, this.props.empresadata.ftt);
         }else{

@@ -35,7 +35,7 @@ function FacebookInsightsLinkModal(props) {
     var insightsList = props.insights.map(function(insight, index){
         var insightsValues = insight.values.map((valores, index2) => {
             return(
-                <span>{valores.value}</span>
+                <span key={index2}>{valores.value}</span>
             ); 
         });
         return (<div key={index}>

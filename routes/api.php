@@ -46,17 +46,19 @@ Route::middleware('json.response', 'auth:api')->group(function () {
         Route::get('/{empresa}', [EmpresaController::class, 'show'])->name('api.empresas_info');
         Route::put('/{empresa}', [EmpresaController::class, 'update'])->middleware('api.superAdmin')->name('api.empresas_update');
         Route::delete('/{empresa}', [EmpresaController::class, 'destroy'])->middleware('api.superAdmin')->name('api.empresas_delete');
-        Route::post('/readFbData', [EmpresaController::class, 'readFbData'])->name('api.empresas_readfb');
+        //Route::post('/readFbData', [EmpresaController::class, 'readFbData'])->name('api.empresas_readfb');
     });
 
     //Facebook
     Route::group(['prefix' => 'facebook'], function () {
         Route::get('/published_posts', [FacebookController::class, 'getPublishedPosts'])->middleware('api.admin')->name('api.facebook_published_posts_get');
+        Route::get('/page_insights', [FacebookController::class, 'getPageInsights'])->middleware('api.admin')->name('api.facebook_page_insights_get');
+        Route::post('/readFbData', [FacebookController::class, 'readFbData'])->name('api.facebook_readfb');
     });
 });
 
-Route::middleware('auth:api')->group(function () {
+/*Route::middleware('auth:api')->group(function () {
     Route::group(['prefix' => 'empresas'], function () {
         Route::post('/readFbData', [EmpresaController::class, 'readFbData'])->name('api.empresas_readfb');
     });
-});
+});*/

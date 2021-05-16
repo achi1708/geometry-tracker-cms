@@ -49,6 +49,89 @@ const Facebook = {
         return {status: status, msg: msg };
     },
 
+    async getPageInsightsListAdm (page = 1, setOrder = {}, empresaId) {
+        let self = this;
+        let status = false;
+        let msg = [];
+        let paramsGet = {};
+        paramsGet.emp = empresaId;
+        paramsGet.page = page;
+        if(setOrder.name){
+            paramsGet.orderCol = setOrder.name;
+        }
+
+        if(setOrder.direction){
+            paramsGet.orderDir = setOrder.direction;
+        }
+
+        let req = await axios.get(`/api/facebook/page_insights`, {params: paramsGet})
+                    .then(function(response){
+                        if(response.data && response.status == 200){
+                            status = true;
+                            msg = response.data;
+                        }else{
+                            status = false;
+                            if(response.data.errors){
+                                msg = response.data.errors;
+                            }else{
+                                msg = ['ERROR_LIST'];
+                            }
+                        }
+
+                        return true;
+                    })
+                    .catch(function(error){
+                        status = false;
+                        if(error.response.data.errors){
+                            msg = error.response.data.errors;
+                        }else{
+                            msg = ['ERROR_LIST'];
+                        }
+
+                        return false;
+                    });
+        return {status: status, msg: msg };
+    },
+
+    async readFacebookInfo (params) {
+
+        let self = this;
+        let status = false;
+        let msg = [];
+        let resp_data = false;
+
+        let req = await axios.post('/api/facebook/readFbData', params)
+                    .then(function(response){
+                        console.log(response);
+                        resp_data = response;
+                        if(response.data && (response.status == 200 || response.status == 201)){
+                            status = true;
+                            msg = ['ok'];
+                        }else{
+                            status = false;
+                            if(response.data.errors){
+                                msg = response.data.errors;
+                            }else{
+                                msg = ['Error'];
+                            }
+                        }
+
+                        return true;
+                    })
+                    .catch(function(error){
+                        status = false;
+                        resp_data = error.response;
+                        if(error.response.data.errors){
+                            msg = error.response.data.errors;
+                        }else{
+                            msg = ['Error'];
+                        }
+
+                        return false;
+                    });
+        return {status: status, msg: msg, resp_data: resp_data };
+    },
+
     publishedPostsDatatableColumns: [
         {
             name: 'imagen',
@@ -77,7 +160,6 @@ const Facebook = {
                 empty: true,
                 customBodyRender: (value, tableMeta, updateValue) => {
                     if(value){
-                        console.log(tableMeta);
                         return (
                             <div>
                                 {value.substr(0, 30)}
@@ -170,6 +252,30 @@ const Facebook = {
         {
             name: 'fecha_creacion',
             label: 'Fecha Creación',
+            options: {
+                sort: true
+            }
+        }
+    ],
+
+    pageInsightsDatatableColumns: [
+        {
+            name: 'metric',
+            label: 'Metrica',
+            options: {
+                sort: false
+            }
+        },
+        {
+            name: 'metric_date',
+            label: 'Fecha Metrica',
+            options: {
+                sort: true
+            }
+        },
+        {
+            name: 'metric_value',
+            label: 'Valor Metrica',
             options: {
                 sort: true
             }

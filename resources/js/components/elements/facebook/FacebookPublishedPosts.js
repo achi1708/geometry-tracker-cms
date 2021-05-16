@@ -2,6 +2,7 @@ import React, {Component} from 'react';
 import { Switch, Route, withRouter } from 'react-router-dom';
 import LoadingSection from './../LoadingSection';
 import FacebookBtn from './FacebookBtn';
+import FlashMessages from './../FlashMessages';
 import Facebook from './../../services/Facebook';
 import MUIDataTable from 'mui-datatables';
 import {MuiThemeProvider, createMuiTheme} from '@material-ui/core';
@@ -19,7 +20,10 @@ class FacebookPublishedPosts extends Component {
                 data: [['...Cargando información...']],
                 columns: Facebook.publishedPostsDatatableColumns
             },
-            isLoading: false
+            isLoading: false,
+            msgFlashReadFacebook: [],
+            typeMsgFlashReadFb: ''
+
         };
 
         this.getData = this.getData.bind(this);
@@ -28,6 +32,8 @@ class FacebookPublishedPosts extends Component {
         this.setPageDatatable = this.setPageDatatable.bind(this);
         this.makeFacebookBtn = this.makeFacebookBtn.bind(this);
         this.readFacebookPublishedPosts = this.readFacebookPublishedPosts.bind(this);
+        this.reloadDatatable = this.reloadDatatable.bind(this);
+        
     }
 
     componentDidMount () {
@@ -40,6 +46,24 @@ class FacebookPublishedPosts extends Component {
         if(this.props.empresaid !== prevProps.empresaid && this.state.datatable.count == 0){
             this.getData();
         }
+    }
+
+    reloadDatatable (){
+        this.setState({isLoading: true});
+        this.setState( prevState => ({
+            datatable : {
+                ...prevState.datatable, 
+                page: 1,
+                count: 0,
+                rowsPerPage: 50,
+                setOrder: {},
+                data: [['...Cargando información...']]
+            },
+            msgFlashReadFacebook: [],
+            typeMsgFlashReadFb: ''
+        }), function () {
+            this.getData();
+        }.bind(this));
     }
 
     async getData () {
@@ -119,8 +143,34 @@ class FacebookPublishedPosts extends Component {
         }
     }
 
-    readFacebookPublishedPosts() {
-        
+    async readFacebookPublishedPosts(fat, ftt, fuid) {
+        console.log(fat);
+        console.log(ftt);
+        console.log(fuid);
+        this.setState({isLoading: true, msgFlashReadFacebook: [], typeMsgFlashReadFb: ''},
+        async function () {
+            const self = this;
+            const params = {fat, ftt, fuid, emp: this.props.empresaid, process: 'publish_posts'};
+            let req = await Facebook.readFacebookInfo(params);
+            if(req.status == true) {
+                const {data} = req.resp_data;
+                if(data.msg == 'PROCESO_OK'){
+                    this.setState({
+                        msgFlashReadFacebook: [data.msg_extra],
+                        typeMsgFlashReadFb: 'success'
+                    });
+
+                    let timer = setTimeout(() => self.reloadDatatable(), 1500);
+                }
+                
+            }else{
+                this.setState({
+                    msgFlashReadFacebook: req.msg,
+                    typeMsgFlashReadFb: 'danger'
+                });
+            }
+            this.setState({isLoading: false});
+        }.bind(this));
     }
 
     render () {
@@ -190,6 +240,10 @@ class FacebookPublishedPosts extends Component {
                 <LoadingSection />
                 : ''}
                 {fbBtn}
+                { this.state.msgFlashReadFacebook.length > 0 ?
+                    <FlashMessages messages={this.state.msgFlashReadFacebook} type={this.state.typeMsgFlashReadFb} /> :
+                    ''
+                }
                 <MuiThemeProvider theme={theme}>
                     <MUIDataTable
                         data={data}

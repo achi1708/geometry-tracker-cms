@@ -71,7 +71,7 @@ const Empresas = {
         return {status: status, msg: msg };
     },
 
-    async readFacebookInfo (params) {
+    /*async readFacebookInfo (params) {
 
         let self = this;
         let status = false;
@@ -105,7 +105,7 @@ const Empresas = {
                         return false;
                     });
         return {status: status, msg: msg };
-    },
+    },*/
 
     convertLogoToImage: (blob) => new Promise((resolve, reject) => {
         const newBlob = new Blob(blob);
