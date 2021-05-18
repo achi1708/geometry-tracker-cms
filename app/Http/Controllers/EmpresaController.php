@@ -137,9 +137,9 @@ class EmpresaController extends Controller
 
         $rules = [
             'name' => 'required|string|max:255',
-            'logo' => 'sometimes|image',
-            'apps' => 'sometimes|array|exists:app,id',
-            'users' => 'sometimes|array|exists:users,id'
+            //'logo' => 'sometimes|image',
+            'apps' => 'sometimes',
+            'users' => 'sometimes'
         ];
 
         $validator = Validator::make($request->all(), $rules);
@@ -150,7 +150,7 @@ class EmpresaController extends Controller
         }
 
         $empresa_logo = false;
-        if(isset($request['logo'])){
+        if(isset($request['logo']) && $request['logo'] != null && $request['logo'] != ''){
             $path = $request->file('logo')->getRealPath();
             $logo = file_get_contents($path);
             $base64 = base64_encode($logo);
@@ -165,11 +165,17 @@ class EmpresaController extends Controller
         $empresa->update($empresa_arr);
 
         //Si envian apps
+        if(is_string($request['apps'])){
+            $request['apps'] = explode(",", $request['apps']);
+        }
         if(isset($request['apps']) && is_array($request['apps'])){
             $this->attachAppsToEmpresa($request['apps'], $empresa);
         }
 
         //Si envian users
+        if(is_string($request['users'])){
+            $request['users'] = explode(",", $request['users']);
+        }
         if(isset($request['users']) && is_array($request['users'])){
             $this->attachUsersToEmpresa($request['users'], $empresa);
         }

@@ -32,7 +32,7 @@ class EmpresaCard extends Component {
 
         if(this.props.userdata){
             if(this.props.userdata.access.includes('empresas.edit')){
-                opts.push((<a key="10" className="dropdown-item" href="#">Editar</a>))
+                opts.push((<Link key="10" className="dropdown-item" to={`/empresas/edit/${id}`}>Editar</Link>))
             }
         }
 
@@ -45,9 +45,7 @@ class EmpresaCard extends Component {
     
     render () {
         let {name, logo} = this.state.empresaInfo;
-        if(logo){
-            logo = new Buffer( logo, "binary" ).toString("base64");
-        }
+    
         const optsMenu = this.renderDropdownMenu();
         return (
             <div className="card border-left-primary shadow h-100 py-2">
@@ -70,7 +68,7 @@ class EmpresaCard extends Component {
                         </div>
                         <div className="col-auto">
                             {(logo) ? 
-                            <img src={"data:image/jpeg;base64," + logo} />
+                            <img style={{width:'2em'}} src={"data:image/jpeg;base64," + logo} />
                             :
                             <i className="fas fa-calendar fa-2x text-gray-300"></i>
                             }

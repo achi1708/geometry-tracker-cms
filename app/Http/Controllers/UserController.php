@@ -34,6 +34,19 @@ class UserController extends Controller
         return UserResource::collection($users);
     }
 
+    public function usersFilter(Request $request)
+    {
+        $users = User::with('empresas');
+
+        if(isset($request['role'])){
+            $users = $users->where('role', $request['role']);
+        }
+
+        $users = $users->get();
+
+        return UserResource::collection($users);
+    }
+
     /**
      * Store a newly created resource in storage.
      *

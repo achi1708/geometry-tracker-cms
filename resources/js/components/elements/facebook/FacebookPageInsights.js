@@ -229,7 +229,7 @@ class FacebookPageInsights extends Component {
         });
 
         return (
-            <div className="card shadow mb-4 p-3">
+            <div style={{width: '100%'}} className="card shadow mb-4 p-3">
                 {(isLoading) ? 
                 <LoadingSection />
                 : ''}

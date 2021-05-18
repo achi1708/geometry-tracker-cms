@@ -71,6 +71,42 @@ const Empresas = {
         return {status: status, msg: msg };
     },
 
+    async doEditEmpresa (formData, editId) {
+
+        let self = this;
+        let status = false;
+        let msg = [];
+
+        let req = await axios.post(`/api/empresas/update/${editId}`, formData)
+                    .then(function(response){
+                        if(response.data && (response.status == 200 || response.status == 201)){
+                            status = true;
+                            msg = ['Empresa editada correctamente'];
+                        }else{
+                            status = false;
+                            if(response.data.errors){
+                                msg = response.data.errors;
+                            }else{
+                                msg = ['Ocurrió un error al editar la empresa, por favor intente de nuevo.'];
+                            }
+                        }
+
+                        return true;
+                    })
+                    .catch(function(error){
+                        status = false;
+                        if(error.response.data.errors){
+                            msg = error.response.data.errors;
+                        }else{
+                            msg = ['Ocurrió un error al editar la empresa, por favor intente de nuevo.'];
+                        }
+
+                        return false;
+                    });
+
+        return {status: status, msg: msg };
+    },
+
     /*async readFacebookInfo (params) {
 
         let self = this;

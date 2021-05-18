@@ -1,6 +1,7 @@
 import React, {Component} from 'react';
 import { Switch, Route, withRouter } from 'react-router-dom';
 import EmpresasList from './subpages/EmpresasList';
+import EmpresaEdit from './subpages/EmpresaEdit';
 import EmpresasFacebook from './subpages/EmpresasFacebook';
 /*import UserEdit from './subpages/UserEdit';*/
 
@@ -17,6 +18,16 @@ class Empresas extends Component {
                     {this.props.userdata.access ?
                         (this.props.userdata.access.includes('empresas.list')) ?
                         <EmpresasList userdata={this.props.userdata} />
+                        :
+                        'Error de acceso'
+                    :
+                    'Error de acceso'
+                    }
+                </Route>
+                <Route path={`${path}/edit/:editId`}>
+                    {this.props.userdata.access ?
+                        (this.props.userdata.access.includes('empresas.edit')) ?
+                        <EmpresaEdit userdata={this.props.userdata} />
                         :
                         'Error de acceso'
                     :

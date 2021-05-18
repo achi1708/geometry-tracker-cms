@@ -20,7 +20,8 @@ class EmpresasList extends Component {
     }
 
     componentDidMount () {
-        this.getEmpresasReq();
+        const self = this;
+        let timer = setTimeout(() => self.getEmpresasReq(), 700);
     }
 
     async getEmpresasReq () {
