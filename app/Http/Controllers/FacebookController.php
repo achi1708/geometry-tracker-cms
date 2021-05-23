@@ -25,6 +25,8 @@ use FacebookAds\Api;
 use FacebookAds\Logger\CurlLogger;
 use FacebookAds\Http\Exception\AuthorizationException;
 
+use \Exception;
+
 class FacebookController extends Controller
 {
     /**
