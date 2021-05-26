@@ -60,7 +60,7 @@ class UserController extends Controller
             'email' => 'required|string|email|max:100|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'role' => 'integer|in:1,2',
-            'empresas' => 'required|array|exists:empresas,id'
+            'empresas' => 'sometimes|array|exists:empresas,id'
         ];
 
         $validator = Validator::make($request->all(), $rules);

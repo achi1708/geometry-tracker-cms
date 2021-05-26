@@ -64,8 +64,8 @@ class EmpresaController extends Controller
         $rules = [
             'name' => 'required|string|max:255',
             'logo' => 'sometimes|image',
-            'apps' => 'required|array|exists:app,id',
-            'users' => 'sometimes|array|exists:users,id'
+            'apps' => 'required',
+            'users' => 'sometimes'
         ];
 
         $validator = Validator::make($request->all(), $rules);
@@ -91,11 +91,17 @@ class EmpresaController extends Controller
         $empresa = Empresas::create($empresa_arr);
 
         //Si envian apps
+        if(is_string($request['apps'])){
+            $request['apps'] = explode(",", $request['apps']);
+        }
         if(isset($request['apps']) && is_array($request['apps'])){
             $this->attachAppsToEmpresa($request['apps'], $empresa);
         }
 
         //Si envian users
+        if(is_string($request['users'])){
+            $request['users'] = explode(",", $request['users']);
+        }
         if(isset($request['users']) && is_array($request['users'])){
             $this->attachUsersToEmpresa($request['users'], $empresa);
         }
