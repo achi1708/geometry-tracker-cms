@@ -87,12 +87,15 @@ class FacebookController extends Controller
         {
             return response(['errors' => $validator->errors()->all()], 422);
         }
+
+        $fecha_request = date('Y-m-d', strtotime("-1 month"));
         
-        $facebookPageInsights = FacebookPageInsights::where('empresa_id', $request['emp']);
+        $facebookPageInsights = FacebookPageInsights::where('empresa_id', $request['emp'])
+                                                    ->where('metric_date', '>=', $fecha_request);
 
-        $facebookPageInsights = $facebookPageInsights->orderBy('metric', 'asc');
+        $facebookPageInsights = $facebookPageInsights->orderBy('metric', 'asc')->orderBy('metric_date', 'asc');
 
-        if(isset($request['orderCol'])){
+        /*if(isset($request['orderCol'])){
             $orderCol = $request['orderCol'];
 
             if(isset($request['orderDir']) && strtolower($request['orderDir']) == 'asc'){
@@ -102,9 +105,9 @@ class FacebookController extends Controller
             }
         }else{
             $facebookPageInsights = $facebookPageInsights->orderBy('metric_date', 'desc');
-        }
+        }*/
 
-        $facebookPageInsights = $facebookPageInsights->paginate(50);
+        $facebookPageInsights = $facebookPageInsights->get();
 
         return FacebookPageInsightsResource::collection($facebookPageInsights);
     }
@@ -222,6 +225,8 @@ class FacebookController extends Controller
                 //Trae los datos de insights de la page
                 $info_page_insights = $this->get_fb_page_insights($app_id, $app_secret, $page_access_token, $account_id);
 
+                //var_dump($info_page_insights);
+
                 if($info_page_insights['status'] == 'Ok'){
                     $this->save_page_insights($info_page_insights['data'], $request['emp']);
                     $process_result = true;
@@ -289,11 +294,11 @@ class FacebookController extends Controller
         }
 
         if($process_result){
-            $empresa->fb_access_token = $access_token;
+            /*$empresa->fb_access_token = $access_token;
             $empresa->fb_token_time = $access_token_time;
             $empresa->fb_account_id = $account_id;
             $empresa->fb_user_logged_id = $userid;
-            $empresa->save();
+            $empresa->save();*/
 
             return response(['msg' => "PROCESO_OK", 'msg_extra' => $process_msg], 200);
         }else{
@@ -395,7 +400,7 @@ class FacebookController extends Controller
                 'message_tags',
                 'picture',
                 'properties',
-                'insights.metric(post_engaged_users,page_posts_impressions,page_posts_impressions_organic,page_posts_impressions_viral,post_engaged_fan,post_clicks,post_impressions,post_impressions_fan){id,description,description_from_api_doc,name,period,title,values}'
+                'insights.metric(post_engaged_users,post_negative_feedback,post_negative_feedback_unique,post_engaged_fan,post_clicks,post_clicks_unique,post_impressions,post_impressions_unique,post_impressions_paid,post_impressions_paid_unique,post_impressions_organic,post_impressions_organic_unique,post_reactions_like_total,post_reactions_anger_total,post_reactions_by_type_total,post_video_views_organic_unique,post_video_views_paid_unique){id,description,description_from_api_doc,name,period,title,values}'
             );
 
             $params = array(
@@ -487,7 +492,7 @@ class FacebookController extends Controller
             );
 
             $params = array(
-                'metric' => 'page_engaged_users,page_post_engagements,page_consumptions,page_consumptions_unique,page_negative_feedback,page_negative_feedback_unique,page_impressions,page_impressions_unique,page_impressions_paid,page_impressions_paid_unique,page_impressions_viral,page_impressions_viral_unique,page_video_views,page_video_views_unique,page_video_views_paid,page_video_views_organic,page_views_total,page_views_logout,page_views_logged_in_total,page_views_logged_in_unique',
+                'metric' => 'page_engaged_users,page_post_engagements,page_negative_feedback,page_negative_feedback_unique,page_positive_feedback_by_type,page_positive_feedback_by_type_unique,page_impressions,page_impressions_unique,page_posts_impressions,page_fans,page_fans_city,page_fans_country,page_fans_gender_age,page_fan_adds,page_fan_removes,post_video_views_organic,post_video_views_paid',
                 'date_preset' => 'last_30d',
                 'period' => 'day'
             );
@@ -530,7 +535,7 @@ class FacebookController extends Controller
                                     $data_insight = array('empresa_id' => $empresa_id,
                                                           'metric'     => $insights_data['name'],
                                                           'metric_date'=> date("Y-m-d", strtotime($value_per_day['end_time'])),
-                                                          'metric_value' => $value_per_day['value']
+                                                          'metric_value' => (is_array($value_per_day['value']) ? json_encode($value_per_day['value']) : $value_per_day['value'])
                                                         );
 
                                     $facebook_page_insight = FacebookPageInsights::where('empresa_id', $empresa_id)

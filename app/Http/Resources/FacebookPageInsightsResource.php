@@ -19,7 +19,16 @@ class FacebookPageInsightsResource extends JsonResource
             'empresa' => $this->empresas,
             'metric' => $this->metric,
             'metric_date' => $this->metric_date,
-            'metric_value' => $this->metric_value
+            'metric_value' => $this->getMetricValue()
           ];
+    }
+
+    protected function getMetricValue()
+    {
+        if(strpos($this->metric_value, "[") !== FALSE){
+            return json_decode($this->metric_value);
+        }else{
+            return $this->metric_value;
+        }
     }
 }
