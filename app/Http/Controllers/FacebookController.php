@@ -14,6 +14,9 @@ use App\Models\FacebookEmpresasAdcampaigns;
 use App\Models\FacebookEmpresasAds;
 use App\Http\Resources\FacebookPublishedPostsResource;
 use App\Http\Resources\FacebookPageInsightsResource;
+use App\Http\Resources\FacebookAdAccountsResource;
+use App\Http\Resources\FacebookAdCampaignsResource;
+use App\Http\Resources\FacebookAdAdsResource;
 use Illuminate\Support\Facades\DB;
 
 use FacebookAds\Object\User as FbUser;
@@ -24,6 +27,10 @@ use FacebookAds\Object\Campaign;
 use FacebookAds\Api;
 use FacebookAds\Logger\CurlLogger;
 use FacebookAds\Http\Exception\AuthorizationException;
+
+use App\Exports\FacebookPublishPostsExport;
+use App\Exports\FacebookPageInsightsExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 use \Exception;
 
@@ -110,6 +117,72 @@ class FacebookController extends Controller
         $facebookPageInsights = $facebookPageInsights->get();
 
         return FacebookPageInsightsResource::collection($facebookPageInsights);
+    }
+
+    public function getCompanyAdAccounts(Request $request)
+    {
+        $rules = [
+            'emp' => 'required|exists:empresas,id'
+        ];
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if($validator->fails())
+        {
+            return response(['errors' => $validator->errors()->all()], 422);
+        }
+        
+        $facebookCompanyAdAccounts = FacebookEmpresasAdaccounts::where('empresa_id', $request['emp']);
+
+        $facebookCompanyAdAccounts = $facebookCompanyAdAccounts->orderBy('account_name', 'asc');
+
+        $facebookCompanyAdAccounts = $facebookCompanyAdAccounts->paginate(50);
+
+        return FacebookAdAccountsResource::collection($facebookCompanyAdAccounts);
+    }
+
+    public function getCompanyCampaigns(Request $request)
+    {
+        $rules = [
+            'adacc' => 'required|exists:facebook_empresas_adaccounts,id'
+        ];
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if($validator->fails())
+        {
+            return response(['errors' => $validator->errors()->all()], 422);
+        }
+        
+        $facebookCompanyCampaigns = FacebookEmpresasAdcampaigns::where('adaccount_id', $request['adacc']);
+
+        $facebookCompanyCampaigns = $facebookCompanyCampaigns->orderBy('created_time', 'desc');
+
+        $facebookCompanyCampaigns = $facebookCompanyCampaigns->paginate(50);
+
+        return FacebookAdCampaignsResource::collection($facebookCompanyCampaigns);
+    }
+
+    public function getCompanyAds(Request $request)
+    {
+        $rules = [
+            'adcamp' => 'required|exists:facebook_empresas_adcampaigns,id'
+        ];
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if($validator->fails())
+        {
+            return response(['errors' => $validator->errors()->all()], 422);
+        }
+        
+        $facebookCompanyAds = FacebookEmpresasAds::where('adcampaign_id', $request['adcamp']);
+
+        $facebookCompanyAds = $facebookCompanyAds->orderBy('name', 'asc');
+
+        $facebookCompanyAds = $facebookCompanyAds->paginate(50);
+
+        return FacebookAdAdsResource::collection($facebookCompanyAds);
     }
 
     public function readFbData(Request $request)
@@ -627,6 +700,7 @@ class FacebookController extends Controller
                 );
         
                 $params = array(
+                    'limit' => 100
                 );
 
                 $business_ad_accounts = (new Business($business_id_final))->getOwnedAdAccounts(
@@ -690,6 +764,7 @@ class FacebookController extends Controller
                     if($existe_adaccount){
                         $existe_adaccount->account_name = $info_emp_adaccount['name'];
                         $existe_adaccount->status = ($info_emp_adaccount['account_status'] == 1 ? $info_emp_adaccount['account_status'] : 0);
+                        $existe_adaccount->updated_at = date('Y-m-d H:i:s');
                         $existe_adaccount->save();
                     }else{
                         $data_new_adaccount = array('empresa_id' => $empresa_id,
@@ -729,6 +804,7 @@ class FacebookController extends Controller
             );
 
             $params = array(
+                'limit' => 1000
             );
 
             $info_adaccount_campaigns = (new AdAccount($adaccount_id))->getCampaigns(
@@ -738,9 +814,21 @@ class FacebookController extends Controller
 
             if(is_array($info_adaccount_campaigns) && isset($info_adaccount_campaigns['data'])){
                 if(count($info_adaccount_campaigns['data']) > 0){
+                    $info_ad_campaigns_list = array_filter($info_adaccount_campaigns['data'], function($data){
+                        return (date("Y-m-d H:i:s", strtotime($data['created_time'])) >= '2021-01-01 00:00:00');
+                    });
+
+                    if(count($info_ad_campaigns_list) <= 0){
+                        if(count($info_adaccount_campaigns['data']) > 25){
+                            $info_ad_campaigns_list = array_slice($info_adaccount_campaigns['data'],0,25);
+                        }else{
+                            $info_ad_campaigns_list = $info_adaccount_campaigns['data'];
+                        }
+                    }
+
                     $return['status'] = 'Ok';
                     $return['msg'] = 'info_ok';
-                    $return['data'] = $info_adaccount_campaigns['data'];
+                    $return['data'] = $info_ad_campaigns_list;
                 }else{
                     $return['status'] = 'Error';
                     $return['msg'] = 'No se encuentra información de campañas para esta adaccount';
@@ -829,10 +917,12 @@ class FacebookController extends Controller
             $fields = array(
                 'id',
                 'name',
-                'insights'
+                'insights{account_currency,actions,action_values,ad_click_actions,ad_impression_actions,clicks,conversions,cost_per_ad_click,full_view_impressions,full_view_reach,gender_targeting,impressions}',
+                'created_time'
             );
 
             $params = array(
+                'limit' => 100
             );
 
             $info_adcampaign_ads = (new Campaign($adcampaign_id))->getAds(
@@ -842,9 +932,21 @@ class FacebookController extends Controller
 
             if(is_array($info_adcampaign_ads) && isset($info_adcampaign_ads['data'])){
                 if(count($info_adcampaign_ads['data']) > 0){
+                    $info_ad_ads_list = array_filter($info_adcampaign_ads['data'], function($data){
+                        return (date("Y-m-d H:i:s", strtotime($data['created_time'])) >= '2021-01-01 00:00:00');
+                    });
+
+                    if(count($info_ad_ads_list) <= 0){
+                        if(count($info_adcampaign_ads['data']) > 25){
+                            $info_ad_ads_list = array_slice($info_adcampaign_ads['data'],0,25);
+                        }else{
+                            $info_ad_ads_list = $info_adcampaign_ads['data'];
+                        }
+                    }
+
                     $return['status'] = 'Ok';
                     $return['msg'] = 'info_ok';
-                    $return['data'] = $info_adcampaign_ads['data'];
+                    $return['data'] = $info_ad_ads_list;
                 }else{
                     $return['status'] = 'Error';
                     $return['msg'] = 'No se encuentra información de ads para esta campaña';
@@ -897,5 +999,97 @@ class FacebookController extends Controller
                 }
             });
         }
+    }
+
+    public function exportPublishedPosts($empresa)
+    {
+        $facebookPublishedPosts = FacebookPublishPosts::where('empresa_id', $empresa)->orderBy('created_time', 'desc');
+
+        $facebook_posts = $facebookPublishedPosts->get()->map(function($post){
+            $main = [ 'mensaje' => $post->message,
+                     'foto'    => $post->picture,
+                     'oculto'  => ($post->is_hidden == 0) ? 'No' : 'Si',
+                     'expirado'=> ($post->is_expired == 0) ? 'No' : 'Si',
+                     'popular' => ($post->is_popular == 0) ? 'No' : 'Si',
+                     'publicado' => ($post->is_published == 0) ? 'No' : 'Si',
+                     'creado'  => date("Y-m-d H:i:s", strtotime($post->created_time)),
+                     'tags' => '',
+                     'insight1' => null,
+                     'insight_value1' => null,
+                     'insight2' => null,
+                     'insight_value2' => null,
+                     'insight3' => null,
+                     'insight_value3' => null,
+                     'insight4' => null,
+                     'insight_value4' => null,
+                     'insight5' => null,
+                     'insight_value5' => null,
+                     'insight6' => null,
+                     'insight_value6' => null,
+                     'insight7' => null,
+                     'insight_value7' => null,
+                     'insight8' => null,
+                     'insight_value8' => null,
+                     'insight9' => null,
+                     'insight_value9' => null,
+                     'insight10' => null,
+                     'insight_value10' => null,
+                     'insight11' => null,
+                     'insight_value11' => null,
+                     'insight12' => null,
+                     'insight_value12' => null,
+                     'insight13' => null,
+                     'insight_value13' => null,
+                     'insight14' => null,
+                     'insight_value14' => null,
+                     'insight15' => null,
+                     'insight_value15' => null,
+                     'insight16' => null,
+                     'insight_value16' => null,
+                     'insight17' => null,
+                     'insight_value17' => null,
+                     'insight18' => null,
+                     'insight_value18' => null,
+                     'insight19' => null,
+                     'insight_value19' => null,
+                     'insight20' => null,
+                     'insight_value20' => null
+                   ];
+            
+            $sep = '';
+            if (is_array($post->message_tags) || is_object($post->message_tags))
+            {
+                foreach($post->message_tags as $k_tag => $tag){
+                    $main['tags'] .= $sep.$tag['name'];
+                    $sep = ', ';
+                }
+            }
+
+            if (isset($post->insights['data']) && is_array($post->insights['data']))
+            {
+                foreach($post->insights['data'] as $k_insight => $insight){
+                    $main['insight'.($k_insight + 1)] = $insight['name'];
+                    $main['insight_value'.($k_insight + 1)] = $insight['values'][0]['value'];
+                }
+            }
+
+            return $main;
+        });
+
+        //dd($facebook_posts);
+        //dd(new FacebookPublishPostsExport($facebook_posts));
+        //Excel::store(new FacebookPublishPostsExport($facebook_posts), 'test.xlsx');
+        return Excel::download(new FacebookPublishPostsExport($facebook_posts), 'publish_posts_'.strtotime(date('Y-m-d H:i:s')).'.xlsx');
+    }
+
+    public function exportPageInsights($empresa)
+    {
+        $facebookPageInsightsMetrics = FacebookPageInsights::select('metric')->where('empresa_id', $empresa)->groupBy('metric')->orderBy('metric', 'asc')->get();
+
+        $metrics = $facebookPageInsightsMetrics->map(function($data){
+            return $data['metric'];
+        });
+        //dd($metrics);
+        return Excel::download(new FacebookPageInsightsExport($empresa, $metrics), 'page_insights_'.strtotime(date('Y-m-d H:i:s')).'.xlsx');
     }
 }

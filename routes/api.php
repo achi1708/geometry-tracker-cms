@@ -57,7 +57,12 @@ Route::middleware('json.response', 'auth:api')->group(function () {
     Route::group(['prefix' => 'facebook'], function () {
         Route::get('/published_posts', [FacebookController::class, 'getPublishedPosts'])->middleware('api.admin')->name('api.facebook_published_posts_get');
         Route::get('/page_insights', [FacebookController::class, 'getPageInsights'])->middleware('api.admin')->name('api.facebook_page_insights_get');
+        Route::get('/emp_adaccounts', [FacebookController::class, 'getCompanyAdAccounts'])->middleware('api.admin')->name('api.facebook_ad_accounts_get');
+        Route::get('/emp_campaigns', [FacebookController::class, 'getCompanyCampaigns'])->middleware('api.admin')->name('api.facebook_campaigns_get');
+        Route::get('/emp_ads', [FacebookController::class, 'getCompanyAds'])->middleware('api.admin')->name('api.facebook_ads_get');
         Route::post('/readFbData', [FacebookController::class, 'readFbData'])->name('api.facebook_readfb');
+        Route::get('/export_published_posts/{empresa}', [FacebookController::class, 'exportPublishedPosts'])->middleware('api.admin')->name('api.facebook_published_posts_export');
+        Route::get('/export_page_insights/{empresa}', [FacebookController::class, 'exportPageInsights'])->middleware('api.admin')->name('api.facebook_page_insights_export');
     });
 
     //Apps
@@ -67,7 +72,7 @@ Route::middleware('json.response', 'auth:api')->group(function () {
 });
 
 /*Route::middleware('auth:api')->group(function () {
-    Route::group(['prefix' => 'empresas'], function () {
-        Route::post('/readFbData', [EmpresaController::class, 'readFbData'])->name('api.empresas_readfb');
+    Route::group(['prefix' => 'facebook'], function () {
+        Route::post('/readFbData', [FacebookController::class, 'readFbData'])->name('api.empresas_readfb');
     });
 });*/
