@@ -30,6 +30,7 @@ use FacebookAds\Http\Exception\AuthorizationException;
 
 use App\Exports\FacebookPublishPostsExport;
 use App\Exports\FacebookPageInsightsExport;
+use App\Exports\FacebookAdsExport;
 use Maatwebsite\Excel\Facades\Excel;
 
 use \Exception;
@@ -209,7 +210,11 @@ class FacebookController extends Controller
         $account_id = false;
         $page_access_token = false;
 
-        if($empresa->fb_access_token != '' && $empresa->fb_token_time != ''){
+        if($empresa->fb_account_id){
+            $account_id = $empresa->fb_account_id;
+        }
+
+        /*if($empresa->fb_access_token != '' && $empresa->fb_token_time != ''){
             if(intval($empresa->fb_token_time) > strtotime(date('Y-m-d'))){
                 $access_token = $empresa->fb_access_token;
                 $access_token_time = $empresa->fb_token_time;
@@ -222,7 +227,7 @@ class FacebookController extends Controller
                     $userid = $empresa->fb_user_logged_id;
                 }
             }
-        }
+        }*/
 
         //dd($access_token, $access_token_time, $account_id, $userid);
 
@@ -241,11 +246,27 @@ class FacebookController extends Controller
             return response(['errors' => ['No se cuenta con el acceso correcto al usuario de Facebook que administra esta empresa']], 422);
         }
 
-        if(!$account_id){
-            if(!$userid){
-                return response(['errors' => ['No se cuenta con el acceso correcto al usuario de Facebook que administra esta empresa']], 422);
+        if($process != "business_ads"){
+            if(!$account_id){
+                if(!$userid){
+                    return response(['errors' => ['No se cuenta con el acceso correcto al usuario de Facebook que administra esta empresa']], 422);
+                }else{
+                    $account_id_search = (isset($request['account_id_select']) ? $request['account_id_select'] : false);
+                    $get_account_fb = $this->get_fb_user_accounts($app_id, $app_secret, $access_token, $userid, $account_id_search);
+
+                    if($get_account_fb['status'] != 'Ok'){
+                        return response(['errors' => [$get_account_fb['msg']]], 422);
+                    }else{
+                        if($get_account_fb['msg'] == "multiple_accounts"){
+                            return response(['msg' => "MULTIPLE_ACCOUNTS", 'msg_extra' => $get_account_fb['data']], 200);
+                        }else{
+                            $account_id = $get_account_fb['data']['account_id'];
+                            $page_access_token = $get_account_fb['data']['page_access_token'];
+                        }
+                    }
+                }
             }else{
-                $account_id_search = (isset($request['account_id_select']) ? $request['account_id_select'] : false);
+                $account_id_search = $account_id;
                 $get_account_fb = $this->get_fb_user_accounts($app_id, $app_secret, $access_token, $userid, $account_id_search);
 
                 if($get_account_fb['status'] != 'Ok'){
@@ -257,20 +278,6 @@ class FacebookController extends Controller
                         $account_id = $get_account_fb['data']['account_id'];
                         $page_access_token = $get_account_fb['data']['page_access_token'];
                     }
-                }
-            }
-        }else{
-            $account_id_search = $account_id;
-            $get_account_fb = $this->get_fb_user_accounts($app_id, $app_secret, $access_token, $userid, $account_id_search);
-
-            if($get_account_fb['status'] != 'Ok'){
-                return response(['errors' => [$get_account_fb['msg']]], 422);
-            }else{
-                if($get_account_fb['msg'] == "multiple_accounts"){
-                    return response(['msg' => "MULTIPLE_ACCOUNTS", 'msg_extra' => $get_account_fb['data']], 200);
-                }else{
-                    $account_id = $get_account_fb['data']['account_id'];
-                    $page_access_token = $get_account_fb['data']['page_access_token'];
                 }
             }
         }
@@ -370,8 +377,9 @@ class FacebookController extends Controller
             /*$empresa->fb_access_token = $access_token;
             $empresa->fb_token_time = $access_token_time;
             $empresa->fb_account_id = $account_id;
-            $empresa->fb_user_logged_id = $userid;
-            $empresa->save();*/
+            $empresa->fb_user_logged_id = $userid;*/
+            $empresa->fb_account_id = $account_id;
+            $empresa->save();
 
             return response(['msg' => "PROCESO_OK", 'msg_extra' => $process_msg], 200);
         }else{
@@ -917,7 +925,7 @@ class FacebookController extends Controller
             $fields = array(
                 'id',
                 'name',
-                'insights{account_currency,actions,action_values,ad_click_actions,ad_impression_actions,clicks,conversions,cost_per_ad_click,full_view_impressions,full_view_reach,gender_targeting,impressions}',
+                'insights{account_name,action_values,actions,ad_click_actions,ad_impression_actions,ad_name,adset_name,age_targeting,campaign_name,clicks,conversion_values,conversions,converted_product_quantity,converted_product_value,created_time,date_start,date_stop,gender_targeting,impressions,objective,reach,spend}',
                 'created_time'
             );
 
@@ -1005,7 +1013,19 @@ class FacebookController extends Controller
     {
         $facebookPublishedPosts = FacebookPublishPosts::where('empresa_id', $empresa)->orderBy('created_time', 'desc');
 
-        $facebook_posts = $facebookPublishedPosts->get()->map(function($post){
+        $fbInsights = array();
+        foreach($facebookPublishedPosts->get() as $publish_post){
+            if (isset($publish_post->insights['data']) && is_array($publish_post->insights['data']))
+            {
+                foreach($publish_post->insights['data'] as $k_insight => $insight){
+                    if(!in_array($insight['name'], $fbInsights)){
+                        $fbInsights[] = $insight['name'];
+                    }
+                }
+            }
+        }
+
+        $facebook_posts = $facebookPublishedPosts->get()->map(function($post) use($fbInsights){
             $main = [ 'mensaje' => $post->message,
                      'foto'    => $post->picture,
                      'oculto'  => ($post->is_hidden == 0) ? 'No' : 'Si',
@@ -1013,47 +1033,7 @@ class FacebookController extends Controller
                      'popular' => ($post->is_popular == 0) ? 'No' : 'Si',
                      'publicado' => ($post->is_published == 0) ? 'No' : 'Si',
                      'creado'  => date("Y-m-d H:i:s", strtotime($post->created_time)),
-                     'tags' => '',
-                     'insight1' => null,
-                     'insight_value1' => null,
-                     'insight2' => null,
-                     'insight_value2' => null,
-                     'insight3' => null,
-                     'insight_value3' => null,
-                     'insight4' => null,
-                     'insight_value4' => null,
-                     'insight5' => null,
-                     'insight_value5' => null,
-                     'insight6' => null,
-                     'insight_value6' => null,
-                     'insight7' => null,
-                     'insight_value7' => null,
-                     'insight8' => null,
-                     'insight_value8' => null,
-                     'insight9' => null,
-                     'insight_value9' => null,
-                     'insight10' => null,
-                     'insight_value10' => null,
-                     'insight11' => null,
-                     'insight_value11' => null,
-                     'insight12' => null,
-                     'insight_value12' => null,
-                     'insight13' => null,
-                     'insight_value13' => null,
-                     'insight14' => null,
-                     'insight_value14' => null,
-                     'insight15' => null,
-                     'insight_value15' => null,
-                     'insight16' => null,
-                     'insight_value16' => null,
-                     'insight17' => null,
-                     'insight_value17' => null,
-                     'insight18' => null,
-                     'insight_value18' => null,
-                     'insight19' => null,
-                     'insight_value19' => null,
-                     'insight20' => null,
-                     'insight_value20' => null
+                     'tags' => ''
                    ];
             
             $sep = '';
@@ -1065,13 +1045,22 @@ class FacebookController extends Controller
                 }
             }
 
-            if (isset($post->insights['data']) && is_array($post->insights['data']))
-            {
-                foreach($post->insights['data'] as $k_insight => $insight){
-                    $main['insight'.($k_insight + 1)] = $insight['name'];
-                    $main['insight_value'.($k_insight + 1)] = $insight['values'][0]['value'];
+            foreach($fbInsights as $insightMetric){
+                if (isset($post->insights['data']) && is_array($post->insights['data']))
+                {
+                    foreach($post->insights['data'] as $k_insight => $insight){
+                        if($insight['name'] == $insightMetric){
+                            $main[$insightMetric] = $insight['values'][0]['value'];
+                            continue 2;
+                        }
+                    }
+                }
+
+                if(!isset($main[$insightMetric])){
+                    $main[$insightMetric] = "";
                 }
             }
+            
 
             return $main;
         });
@@ -1079,7 +1068,7 @@ class FacebookController extends Controller
         //dd($facebook_posts);
         //dd(new FacebookPublishPostsExport($facebook_posts));
         //Excel::store(new FacebookPublishPostsExport($facebook_posts), 'test.xlsx');
-        return Excel::download(new FacebookPublishPostsExport($facebook_posts), 'publish_posts_'.strtotime(date('Y-m-d H:i:s')).'.xlsx');
+        return Excel::download(new FacebookPublishPostsExport($facebook_posts, $fbInsights), 'publish_posts_'.strtotime(date('Y-m-d H:i:s')).'.xlsx');
     }
 
     public function exportPageInsights($empresa)
@@ -1091,5 +1080,16 @@ class FacebookController extends Controller
         });
         //dd($metrics);
         return Excel::download(new FacebookPageInsightsExport($empresa, $metrics), 'page_insights_'.strtotime(date('Y-m-d H:i:s')).'.xlsx');
+    }
+
+    public function exportAds($empresa)
+    { 
+        $facebookAccounts = FacebookEmpresasAdaccounts::select('id')->where('empresa_id', $empresa)->orderBy('account_name', 'asc')->get();
+
+        $adAccountsIds = $facebookAccounts->map(function($data){
+            return $data['id'];
+        });
+
+        return Excel::download(new FacebookAdsExport($empresa, $adAccountsIds), 'ads_'.strtotime(date('Y-m-d H:i:s')).'.xlsx');
     }
 }

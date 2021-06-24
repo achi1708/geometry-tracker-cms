@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\ApiAuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\FacebookController;
+use App\Http\Controllers\InstagramController;
 use App\Http\Controllers\AppController;
 
 /*
@@ -63,6 +64,14 @@ Route::middleware('json.response', 'auth:api')->group(function () {
         Route::post('/readFbData', [FacebookController::class, 'readFbData'])->name('api.facebook_readfb');
         Route::get('/export_published_posts/{empresa}', [FacebookController::class, 'exportPublishedPosts'])->middleware('api.admin')->name('api.facebook_published_posts_export');
         Route::get('/export_page_insights/{empresa}', [FacebookController::class, 'exportPageInsights'])->middleware('api.admin')->name('api.facebook_page_insights_export');
+        Route::get('/export_ads/{empresa}', [FacebookController::class, 'exportAds'])->middleware('api.admin')->name('api.facebook_ads_export');
+    });
+
+    //Instagram
+    Route::group(['prefix' => 'instagram'], function () {
+        Route::get('/instagram_media', [InstagramController::class, 'getInstagramMedia'])->middleware('api.admin')->name('api.instagram_media_get');
+        Route::post('/readIgData', [InstagramController::class, 'readIgData'])->name('api.instagram_readig');
+        Route::get('/export_media/{empresa}', [InstagramController::class, 'exportInstagramMedia'])->middleware('api.admin')->name('api.instagram_media_export');
     });
 
     //Apps

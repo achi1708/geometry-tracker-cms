@@ -20,7 +20,30 @@ class FacebookAdAdsResource extends JsonResource
             'adaccount' => $this->facebookEmpresasAdcampaigns->facebookEmpresasAdaccounts,
             'ad_id' => $this->ad_id,
             'name' => $this->name,
-            'insights' => $this->insights
+            'insights' => $this->getInsights()
           ];
+    }
+
+    protected function getInsights()
+    {
+        $insights = array();
+
+        if($this->insights != '[]' && is_array($this->insights)){
+            if(count($this->insights) > 0){
+                foreach($this->insights as $k => $insights_nodes){
+                    foreach($insights_nodes as $item => $value){
+                        if(is_array($value) && $item == 'actions'){
+                            foreach($value as $j => $sub_nodes){
+                                $insights[] = array('metric' => $sub_nodes['action_type'], 'value' => $sub_nodes['value']);
+                            }
+                        }else{
+                            $insights[] = array('metric' => $item, 'value' => $value);
+                        }
+                    }
+                }
+            }
+        }
+
+        return $insights;
     }
 }
