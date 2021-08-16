@@ -12,6 +12,8 @@ use App\Models\FacebookPageInsights;
 use App\Models\FacebookEmpresasAdaccounts;
 use App\Models\FacebookEmpresasAdcampaigns;
 use App\Models\FacebookEmpresasAds;
+use App\Models\FacebookAdsInsights;
+use App\Models\FacebookPublishPostsProperties;
 use App\Http\Resources\FacebookPublishedPostsResource;
 use App\Http\Resources\FacebookPageInsightsResource;
 use App\Http\Resources\FacebookAdAccountsResource;
@@ -550,15 +552,82 @@ class FacebookController extends Controller
                                             ->where('post_id', $published_post['id'])
                                             ->first();
 
+                        $post_id_propeties = FALSE;
+
                         if($facebook_post){
                             $facebook_post->update($data_post);
+                            $post_id_propeties = $facebook_post->id;
                         }else{
                             $data_post['empresa_id'] = $empresa_id;
                             $facebook_post = FacebookPublishPosts::create($data_post);
+                            $post_id_propeties = $facebook_post->id;
+                        }
+
+                        if($post_id_propeties !== FALSE){
+                            if(count($published_post['message_tags']) > 0){
+                                $this->save_publish_post_properties($post_id_propeties, 'tags', $published_post['message_tags']);
+                            }
+
+                            if(isset($published_post['insights']) && isset($published_post['insights']['data'])){
+                                $this->save_publish_post_properties($post_id_propeties, 'insights', $published_post['insights']['data']);
+                            }
                         }
                     }
                 }
             });
+        }
+    }
+
+    private function save_publish_post_properties($post_id, $type, $data){
+        FacebookPublishPostsProperties::where('post_id', $post_id)->where('type', $type)->delete();
+
+        switch($type){
+            case "tags":
+                foreach($data as $item){
+                    $post_prop_data = array('post_id' => $post_id,
+                                            'type' => $type,
+                                            'metric' => 'tag',
+                                            'metric_value'   => $item['name']
+                                            );
+
+                    $post_prop_new = FacebookPublishPostsProperties::create($post_prop_data);
+                }
+                break;
+            case "insights":
+                foreach($data as $item){
+                    switch($item['name']){
+                        case "post_reactions_by_type_total":
+                            foreach($item['values'] as $value_item){
+                                if(isset($value_item['value'])){
+                                    foreach($value_item['value'] as $title => $value){
+                                        $post_prop_data = array('post_id' => $post_id,
+                                                            'type' => $type,
+                                                            'metric' => $item['name']." (".$title.")",
+                                                            'metric_value'   => $value
+                                                            );
+
+                                        $post_prop_new = FacebookPublishPostsProperties::create($post_prop_data);
+                                    }
+                                }
+                            }
+                            break;
+
+                        default:
+                            foreach($item['values'] as $value_item){
+                                if(isset($value_item['value'])){
+                                    $post_prop_data = array('post_id' => $post_id,
+                                                            'type' => $type,
+                                                            'metric' => $item['name'],
+                                                            'metric_value'   => $value_item['value']
+                                                            );
+
+                                    $post_prop_new = FacebookPublishPostsProperties::create($post_prop_data);
+                                }
+                            }
+                            break;
+                    }
+                }
+                break;
         }
     }
 
@@ -993,6 +1062,9 @@ class FacebookController extends Controller
                             if($ad_exists){
                                 $ad_exists->name = $ad_item['name'];
                                 $ad_exists->insights = (isset($ad_item['insights']) ? $ad_item['insights']['data'] : '[]' );
+                                $ad_exists->save();
+
+                                $this->save_fb_ads_insights($ad_exists->id, $ad_item);
                             }else{
                                 $new_ad_data = array('adcampaign_id' => $get_campaign->id,
                                                      'ad_id'         => $ad_item['id'],
@@ -1001,11 +1073,61 @@ class FacebookController extends Controller
                                                     );
 
                                 $ad_new = FacebookEmpresasAds::create($new_ad_data);
+
+                                $this->save_fb_ads_insights($ad_new->id, $ad_item);
                             }
                         }
                     }                                                            
                 }
             });
+        }
+    }
+
+    public function save_fb_ads_insights($ad_id, $ad_data)
+    {
+        FacebookAdsInsights::where('ad_id', $ad_id)->delete();
+
+        if(isset($ad_data['insights'])){
+            if(isset($ad_data['insights']['data'])){
+                foreach($ad_data['insights']['data'][0] as $metrica => $value){
+                    if(!is_array($value)){
+                        /*var_dump("No es array");
+                        var_dump($metrica);
+                        var_dump($value);*/
+                        $ad_insight_data = array('ad_id' => $ad_id,
+                                                'metric' => $metrica,
+                                                'metric_value'   => $value
+                                            );
+
+                        $ad_insight_new = FacebookAdsInsights::create($ad_insight_data);
+                    }else{
+                        /*var_dump("es array");
+                        var_dump($metrica);
+                        var_dump($value);*/
+                        foreach($value as $item_value){
+                            $ad_insight_data = array();
+                            switch($metrica){
+                                case "actions":
+                                    $ad_insight_data = array('ad_id' => $ad_id,
+                                                            'metric' => $metrica."_".$item_value['action_type'],
+                                                            'metric_value'   => $item_value['value']
+                                            );
+                                    break;
+
+                                default:
+                                /*var_dump("es array");
+                                var_dump($metrica);
+                                var_dump($value);*/
+                                    break;
+                            }
+
+                            if(count($ad_insight_data) > 0){
+                                $ad_insight_new = FacebookAdsInsights::create($ad_insight_data);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

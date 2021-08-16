@@ -36,6 +36,8 @@ Route::middleware('json.response', 'auth:api')->group(function () {
 
     Route::post('/logout', [ApiAuthController::class, 'logout'])->name('api.logout');
 
+    Route::post('/myprofile', [ApiAuthController::class, 'myprofile'])->name('api.myprofile');
+
     //Users
     Route::group(['middleware' => 'api.superAdmin'], function () {
         Route::resource('users', UserController::class);

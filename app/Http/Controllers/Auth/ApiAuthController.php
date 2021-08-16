@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Http\Resources\UserResource;
 
 class ApiAuthController extends Controller
 {
@@ -67,6 +68,36 @@ class ApiAuthController extends Controller
             }
         } else {
             return response(['errors' => ['Unauthorized']], 422);
+        }
+    }
+
+    public function myprofile(Request $request) {
+        $user_auth = $request->user();
+
+        if($user_auth->id){
+            $rules = [
+                'name' => 'required|string|max:255',
+                'password' => 'sometimes|string|min:8|confirmed'
+            ];
+    
+            $validator = Validator::make($request->all(), $rules);
+    
+            if($validator->fails())
+            {
+                return response(['errors' => $validator->errors()->all()], 422);
+            }
+
+            if(isset($request['password']) && $request['password'] != ''){
+                $request['password'] = Hash::make($request['password']);
+            }
+
+            $user_arr = $request->only(['name', 'password']);
+            $user = User::find($user_auth->id);
+            $user->update($user_arr);
+
+            return new UserResource($user);
+        }else{
+            return response(['errors' => ['Access Denied']], 422);
         }
     }
 
